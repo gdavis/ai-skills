@@ -1,0 +1,15 @@
+---
+description: Git commit workflow — always draft commit messages for approval before running git commit
+alwaysApply: true
+---
+
+# Git Commit Workflow
+
+Never run `git commit` without explicit user approval.
+
+When asked to "draft a commit" or "make a commit":
+1. Present the proposed commit message and list of files to be committed
+2. Wait for the user to approve, edit, or reject
+3. Only run `git commit` after receiving explicit confirmation (e.g., "go ahead", "approved", "commit it")
+
+"Draft" means present for review — do not execute.

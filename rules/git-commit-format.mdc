@@ -1,0 +1,52 @@
+---
+description: Git commit message formatting with gitmoji
+alwaysApply: true
+---
+
+# Git Commit Format
+
+## Summary Line
+
+- Start with a gitmoji that matches the change type (reference: https://gitmoji.dev/)
+- All lowercase after the emoji
+- Single sentence, no trailing period
+
+## Common Gitmoji
+
+| Emoji | Use |
+|-------|-----|
+| ✨ | new feature |
+| 🐛 | bug fix |
+| ♻️ | refactor |
+| 🔥 | remove code or files |
+| 💄 | UI and style changes |
+| ✅ | add or update tests |
+| 📝 | documentation |
+| ⚡️ | performance |
+| 🏗️ | architectural changes |
+| 🗃️ | database changes |
+| 🔧 | configuration changes |
+| 📦️ | packages or compiled files |
+| 🩹 | simple non-critical fix |
+| 👔 | business logic |
+
+## Description
+
+- Include a bulleted list of changes
+- For complex commits, add an explanatory paragraph below the bullet list
+- Omit the paragraph when the summary and bullets make the changes self-evident
+
+## Example
+
+```
+✨ embed episode metadata into playback status cloud record
+
+- override populateRecord to embed isFavorite and isArchived
+- override applyRecord to extract episode flags on import
+- add SyncTrigger to detect episode property changes
+- add syncTriggersByEntityName to sync configuration
+
+Uses Mistral's custom record mapping to bundle episode state
+into the PlaybackStatus CKRecord, matching legacy sync behavior
+without schema changes.
+```
