@@ -1,16 +1,21 @@
 # AI Skills
 
-A collection of AI skills for Claude Code and rules for Cursor.
+A collection of AI instructions, rules, and skills for Claude Code and Cursor.
 
 ## Repository Structure
 
 ```
-skills/
-  {name}/
-    SKILL.md          # skill definition with YAML front-matter
-rules/
-  {name}.mdc          # Cursor rule with YAML front-matter
-install.sh            # installer script
+claude/
+  CLAUDE.md               # global Claude Code instructions
+  rules/
+    {name}.md             # Claude Code rule files
+cursor/
+  rules/
+    {name}.mdc            # Cursor rule with YAML front-matter
+  skills/
+    {name}/
+      SKILL.md            # skill definition with YAML front-matter
+install.sh                # installer script
 ```
 
 ## Installation
@@ -39,16 +44,26 @@ install.sh            # installer script
 
 ## What Gets Installed Where
 
-| Content | Claude Code | Cursor |
-|---------|-------------|--------|
-| Skills (`skills/*/SKILL.md`) | `{target}/skills/{name}/SKILL.md` | `{target}/skills/{name}/SKILL.md` |
-| Rules (`rules/*.mdc`) | — | `{target}/rules/{name}.mdc` |
+| Source | Destination |
+|--------|-------------|
+| `claude/CLAUDE.md` | `{target}/.claude/CLAUDE.md` |
+| `claude/rules/*.md` | `{target}/.claude/rules/` |
+| `cursor/rules/*.mdc` | `{target}/.cursor/rules/` |
+| `cursor/skills/*/SKILL.md` | `{target}/.cursor/skills/` |
 
-Where `{target}` is `~/.claude` / `~/.cursor` for user-global installs, or `{project}/.claude` / `{project}/.cursor` for project installs.
+Where `{target}` is `~/` for user-global installs, or `{project}/` for project installs.
 
-## Adding New Skills or Rules
+## Adding New Items
 
-**Skill** — create `skills/{name}/SKILL.md` with front-matter:
+**Claude rule** — create `claude/rules/{name}.md`:
+
+```markdown
+# My Rule
+
+Rule content here...
+```
+
+**Cursor skill** — create `cursor/skills/{name}/SKILL.md` with front-matter:
 
 ```markdown
 ---
@@ -60,7 +75,7 @@ description: What this skill does
 ...
 ```
 
-**Rule** — create `rules/{name}.mdc` with front-matter:
+**Cursor rule** — create `cursor/rules/{name}.mdc` with front-matter:
 
 ```markdown
 ---

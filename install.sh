@@ -3,8 +3,10 @@ set -euo pipefail
 
 # resolve script's own directory regardless of where it's invoked from
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SKILLS_DIR="$SCRIPT_DIR/skills"
-RULES_DIR="$SCRIPT_DIR/rules"
+CLAUDE_DIR="$SCRIPT_DIR/claude"
+CLAUDE_RULES_DIR="$CLAUDE_DIR/rules"
+CURSOR_SKILLS_DIR="$SCRIPT_DIR/cursor/skills"
+CURSOR_RULES_DIR="$SCRIPT_DIR/cursor/rules"
 
 # ---------------------------------------------------------------------------
 # colors (disabled when stdout is not a terminal)
@@ -98,6 +100,12 @@ Options:
   -h, --help          Show this help message
 
 When no options are given, the script runs interactively.
+
+Install targets:
+  claude/CLAUDE.md          → {target}/.claude/CLAUDE.md
+  claude/rules/*.md         → {target}/.claude/rules/
+  cursor/rules/*.mdc        → {target}/.cursor/rules/
+  cursor/skills/*/SKILL.md  → {target}/.cursor/skills/
 EOF
 }
 
@@ -110,7 +118,6 @@ file_checksum() {
     elif command -v sha256sum >/dev/null 2>&1; then
         sha256sum "$1" | cut -d' ' -f1
     else
-        # fallback: cksum (always available on POSIX)
         cksum "$1" | cut -d' ' -f1
     fi
 }
@@ -121,25 +128,60 @@ file_checksum() {
 # ---------------------------------------------------------------------------
 parse_frontmatter() {
     local file="$1" key="$2"
-    # grab lines between the first pair of --- delimiters, then extract the key
     sed -n '/^---$/,/^---$/p' "$file" \
         | sed -n "s/^${key}: *//p" \
         | head -1
 }
 
 # ---------------------------------------------------------------------------
-# discover_skills — populates parallel arrays SKILL_NAMES, SKILL_DESCS, SKILL_PATHS
+# discover_claude_items — populates CLAUDE_NAMES, CLAUDE_DESCS, CLAUDE_PATHS,
+#   CLAUDE_RELPATHS (path relative to CLAUDE_DIR, used as install dest)
+# ---------------------------------------------------------------------------
+CLAUDE_NAMES=()
+CLAUDE_DESCS=()
+CLAUDE_PATHS=()
+CLAUDE_RELPATHS=()
+
+discover_claude_items() {
+    if [ ! -d "$CLAUDE_DIR" ]; then
+        return
+    fi
+
+    # CLAUDE.md at root
+    if [ -f "$CLAUDE_DIR/CLAUDE.md" ]; then
+        CLAUDE_NAMES+=("CLAUDE.md")
+        CLAUDE_DESCS+=("Global Claude Code instructions")
+        CLAUDE_PATHS+=("$CLAUDE_DIR/CLAUDE.md")
+        CLAUDE_RELPATHS+=("CLAUDE.md")
+    fi
+
+    # rules/*.md
+    if [ -d "$CLAUDE_RULES_DIR" ]; then
+        for file in "$CLAUDE_RULES_DIR"/*.md; do
+            [ -f "$file" ] || continue
+            local name
+            name="$(basename "$file")"
+            CLAUDE_NAMES+=("$name")
+            CLAUDE_DESCS+=("Claude rule")
+            CLAUDE_PATHS+=("$file")
+            CLAUDE_RELPATHS+=("rules/$name")
+        done
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# discover_skills — populates SKILL_NAMES, SKILL_DESCS, SKILL_PATHS
 # ---------------------------------------------------------------------------
 SKILL_NAMES=()
 SKILL_DESCS=()
 SKILL_PATHS=()
 
 discover_skills() {
-    if [ ! -d "$SKILLS_DIR" ]; then
+    if [ ! -d "$CURSOR_SKILLS_DIR" ]; then
         return
     fi
 
-    for dir in "$SKILLS_DIR"/*/; do
+    for dir in "$CURSOR_SKILLS_DIR"/*/; do
         [ -d "$dir" ] || continue
         local skill_file="${dir}SKILL.md"
         if [ ! -f "$skill_file" ]; then
@@ -150,7 +192,6 @@ discover_skills() {
         local name desc
         name="$(parse_frontmatter "$skill_file" "name")"
         desc="$(parse_frontmatter "$skill_file" "description")"
-        # fallback name to directory name
         [ -z "$name" ] && name="$(basename "$dir")"
 
         SKILL_NAMES+=("$name")
@@ -160,18 +201,18 @@ discover_skills() {
 }
 
 # ---------------------------------------------------------------------------
-# discover_rules — populates parallel arrays RULE_NAMES, RULE_DESCS, RULE_PATHS
+# discover_rules — populates RULE_NAMES, RULE_DESCS, RULE_PATHS
 # ---------------------------------------------------------------------------
 RULE_NAMES=()
 RULE_DESCS=()
 RULE_PATHS=()
 
 discover_rules() {
-    if [ ! -d "$RULES_DIR" ]; then
+    if [ ! -d "$CURSOR_RULES_DIR" ]; then
         return
     fi
 
-    for file in "$RULES_DIR"/*.mdc; do
+    for file in "$CURSOR_RULES_DIR"/*.mdc; do
         [ -f "$file" ] || continue
 
         local name desc
@@ -241,7 +282,6 @@ present_items() {
     local items=("$@")
     local count=${#items[@]}
 
-    # start with all selected
     local selected=()
     local i
     for i in $(seq 0 $((count - 1))); do
@@ -289,7 +329,6 @@ present_items() {
                 ;;
             *)
                 for num in $input; do
-                    # validate numeric
                     case "$num" in
                         ''|*[!0-9]*) continue ;;
                     esac
@@ -327,7 +366,6 @@ install_file() {
     local dest_dir
     dest_dir="$(dirname "$dest")"
 
-    # dry-run mode
     if $DRY_RUN; then
         if $USE_LINKS; then
             print_info "[dry-run] symlink $src → $dest"
@@ -338,16 +376,13 @@ install_file() {
         return 0
     fi
 
-    # create destination directory
     if ! mkdir -p "$dest_dir" 2>/dev/null; then
         print_error "Could not create directory: $dest_dir"
         ERRORED=$((ERRORED + 1))
         return 2
     fi
 
-    # check for existing file
     if [ -e "$dest" ] || [ -L "$dest" ]; then
-        # resolve symlink for comparison
         local cmp_dest="$dest"
         if [ -L "$dest" ]; then
             cmp_dest="$(readlink "$dest")"
@@ -424,20 +459,27 @@ install_file() {
 }
 
 # ---------------------------------------------------------------------------
-# install_skill — installs a skill to both Claude Code and Cursor targets
+# install_claude_item — installs a claude item to the Claude base directory
+# ---------------------------------------------------------------------------
+install_claude_item() {
+    local relpath="$1" src="$2" claude_base="$3"
+
+    local dest="$claude_base/$relpath"
+    install_file "$src" "$dest" || true
+}
+
+# ---------------------------------------------------------------------------
+# install_skill — installs a skill to the Cursor skills directory
 # ---------------------------------------------------------------------------
 install_skill() {
-    local name="$1" src="$2" claude_base="$3" cursor_base="$4"
+    local name="$1" src="$2" cursor_base="$3"
 
-    local claude_dest="$claude_base/skills/$name/SKILL.md"
     local cursor_dest="$cursor_base/skills/$name/SKILL.md"
-
-    install_file "$src" "$claude_dest" || true
     install_file "$src" "$cursor_dest" || true
 }
 
 # ---------------------------------------------------------------------------
-# install_rule — installs a rule to Cursor target only
+# install_rule — installs a rule to the Cursor rules directory
 # ---------------------------------------------------------------------------
 install_rule() {
     local name="$1" src="$2" cursor_base="$3"
@@ -452,12 +494,15 @@ install_rule() {
 preview_install() {
     local claude_base="$1" cursor_base="$2"
     shift 2
-    local skill_indices=() rule_indices=()
 
-    # split selected indices into skills and rules
+    local total_claude=${#CLAUDE_NAMES[@]}
     local total_skills=${#SKILL_NAMES[@]}
+
+    local claude_indices=() skill_indices=() rule_indices=()
     for idx in "$@"; do
-        if [ "$idx" -lt "$total_skills" ]; then
+        if [ "$idx" -lt "$total_claude" ]; then
+            claude_indices+=("$idx")
+        elif [ "$idx" -lt $((total_claude + total_skills)) ]; then
             skill_indices+=("$idx")
         else
             rule_indices+=("$idx")
@@ -466,25 +511,28 @@ preview_install() {
 
     print_header "Preview"
 
+    if [ ${#claude_indices[@]} -gt 0 ]; then
+        echo ""
+        printf "  ${BOLD}Claude Code → %s${RESET}\n" "$claude_base"
+        for idx in "${claude_indices[@]}"; do
+            printf "    %s → %s\n" "${CLAUDE_NAMES[$idx]}" "$claude_base/${CLAUDE_RELPATHS[$idx]}"
+        done
+    fi
+
     if [ ${#skill_indices[@]} -gt 0 ]; then
         echo ""
-        printf "  ${BOLD}Skills → Claude Code${RESET}\n"
+        printf "  ${BOLD}Cursor Skills → %s${RESET}\n" "$cursor_base/skills"
         for idx in "${skill_indices[@]}"; do
-            printf "    %s → %s\n" "${SKILL_NAMES[$idx]}" "$claude_base/skills/${SKILL_NAMES[$idx]}/SKILL.md"
-        done
-
-        echo ""
-        printf "  ${BOLD}Skills → Cursor${RESET}\n"
-        for idx in "${skill_indices[@]}"; do
-            printf "    %s → %s\n" "${SKILL_NAMES[$idx]}" "$cursor_base/skills/${SKILL_NAMES[$idx]}/SKILL.md"
+            local skill_idx=$((idx - total_claude))
+            printf "    %s → %s\n" "${SKILL_NAMES[$skill_idx]}" "$cursor_base/skills/${SKILL_NAMES[$skill_idx]}/SKILL.md"
         done
     fi
 
     if [ ${#rule_indices[@]} -gt 0 ]; then
         echo ""
-        printf "  ${BOLD}Rules → Cursor${RESET}\n"
+        printf "  ${BOLD}Cursor Rules → %s${RESET}\n" "$cursor_base/rules"
         for idx in "${rule_indices[@]}"; do
-            local rule_idx=$((idx - total_skills))
+            local rule_idx=$((idx - total_claude - total_skills))
             printf "    %s → %s\n" "${RULE_NAMES[$rule_idx]}" "$cursor_base/rules/${RULE_NAMES[$rule_idx]}.mdc"
         done
     fi
@@ -519,14 +567,17 @@ main() {
     print_header "AI Skills Installer"
 
     # discover available items
+    discover_claude_items
     discover_skills
     discover_rules
 
+    local total_claude=${#CLAUDE_NAMES[@]}
     local total_skills=${#SKILL_NAMES[@]}
     local total_rules=${#RULE_NAMES[@]}
+    local total=$((total_claude + total_skills + total_rules))
 
-    if [ "$total_skills" -eq 0 ] && [ "$total_rules" -eq 0 ]; then
-        print_warn "No skills or rules found in $SCRIPT_DIR"
+    if [ "$total" -eq 0 ]; then
+        print_warn "No items found in $SCRIPT_DIR"
         exit 0
     fi
 
@@ -543,17 +594,19 @@ main() {
         cursor_base="$PROJECT_PATH/.cursor"
     fi
 
-    # build item list for selection
+    # build item list for selection: claude items, then skills, then rules
     local items=()
     local i
+    for i in $(seq 0 $((total_claude - 1))); do
+        items+=("[claude] ${CLAUDE_NAMES[$i]}|${CLAUDE_DESCS[$i]}")
+    done
     for i in $(seq 0 $((total_skills - 1))); do
-        items+=("${SKILL_NAMES[$i]}|${SKILL_DESCS[$i]}")
+        items+=("[skill]  ${SKILL_NAMES[$i]}|${SKILL_DESCS[$i]}")
     done
     for i in $(seq 0 $((total_rules - 1))); do
-        items+=("${RULE_NAMES[$i]}|${RULE_DESCS[$i]}")
+        items+=("[rule]   ${RULE_NAMES[$i]}|${RULE_DESCS[$i]}")
     done
 
-    # item selection (skip in non-interactive modes with no TTY)
     print_header "Select items to install"
     present_items "${items[@]}"
 
@@ -562,10 +615,12 @@ main() {
         exit 0
     fi
 
-    # split selection into skill and rule indices
-    local selected_skills=() selected_rules=()
+    # split selection into claude, skill, and rule indices
+    local selected_claude=() selected_skills=() selected_rules=()
     for idx in "${SELECTED[@]}"; do
-        if [ "$idx" -lt "$total_skills" ]; then
+        if [ "$idx" -lt "$total_claude" ]; then
+            selected_claude+=("$idx")
+        elif [ "$idx" -lt $((total_claude + total_skills)) ]; then
             selected_skills+=("$idx")
         else
             selected_rules+=("$idx")
@@ -585,12 +640,17 @@ main() {
 
     # execute
     echo ""
+    for idx in "${selected_claude[@]}"; do
+        install_claude_item "${CLAUDE_RELPATHS[$idx]}" "${CLAUDE_PATHS[$idx]}" "$claude_base"
+    done
+
     for idx in "${selected_skills[@]}"; do
-        install_skill "${SKILL_NAMES[$idx]}" "${SKILL_PATHS[$idx]}" "$claude_base" "$cursor_base"
+        local skill_idx=$((idx - total_claude))
+        install_skill "${SKILL_NAMES[$skill_idx]}" "${SKILL_PATHS[$skill_idx]}" "$cursor_base"
     done
 
     for idx in "${selected_rules[@]}"; do
-        local rule_idx=$((idx - total_skills))
+        local rule_idx=$((idx - total_claude - total_skills))
         install_rule "${RULE_NAMES[$rule_idx]}" "${RULE_PATHS[$rule_idx]}" "$cursor_base"
     done
 

@@ -1,17 +1,25 @@
----
-description: Git commit message formatting with gitmoji
-alwaysApply: true
----
+# Git Conventions
 
-# Git Commit Format
+## Commit Workflow
 
-## Summary Line
+Never run `git commit` without explicit user approval.
+
+When asked to "draft a commit" or "make a commit":
+1. Present the proposed commit message and list of files to be committed
+2. Wait for the user to approve, edit, or reject
+3. Only run `git commit` after receiving explicit confirmation (e.g., "go ahead", "approved", "commit it")
+
+"Draft" means present for review — do not execute.
+
+## Commit Format
+
+### Summary Line
 
 - Start with a gitmoji that matches the change type (reference: https://gitmoji.dev/)
 - All lowercase after the emoji
 - Single sentence, no trailing period
 
-## Common Gitmoji
+### Common Gitmoji
 
 | Emoji | Use |
 |-------|-----|
@@ -30,13 +38,13 @@ alwaysApply: true
 | 🩹 | simple non-critical fix |
 | 👔 | business logic |
 
-## Description
+### Description
 
 - Include a bulleted list of changes
 - For complex commits, add an explanatory paragraph below the bullet list
 - Omit the paragraph when the summary and bullets make the changes self-evident
 
-## Example
+### Example
 
 ```
 ✨ embed episode metadata into playback status cloud record
@@ -50,3 +58,10 @@ Uses Mistral's custom record mapping to bundle episode state
 into the PlaybackStatus CKRecord, matching legacy sync behavior
 without schema changes.
 ```
+
+## Destructive Operations
+
+- NEVER use `git checkout --` to discard working directory changes. This permanently destroys uncommitted work.
+- If you need to revert changes you made, use `git stash` to preserve the work first, then confirm with the user before dropping the stash.
+- NEVER run any destructive or irreversible git commands (reset, checkout --, clean, etc.) without explicit user approval.
+- When the user asks to "undo" or "revert" changes, always confirm which specific changes they want reverted and whether there are any manual changes in those files that should be preserved.

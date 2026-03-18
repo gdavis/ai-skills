@@ -1,0 +1,10 @@
+---
+description: Git commit workflow, formatting, and safety rules. Apply when staging, committing, reverting, or performing any git operations.
+alwaysApply: false
+---
+
+# Git Conventions
+
+Never run `git commit` without explicit user approval. When asked to "draft a commit" or "make a commit", present the proposed message and file list, then wait for confirmation before executing.
+
+For full git rules including commit format, gitmoji reference, and destructive operation safeguards, read `~/.claude/rules/git-conventions.md`.
