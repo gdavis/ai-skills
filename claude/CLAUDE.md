@@ -5,6 +5,12 @@
 - NEVER create git commits unless the user explicitly requests a commit. Do not run `git add` or `git commit` unless told to.
 - NEVER begin editing code until the user has reviewed and approved the plan. Always present the plan first and wait for explicit approval before making any changes.
 - NEVER add comments, docstrings, or type annotations to code you did not write or change.
+- NEVER interact with the user's credentials, SSH agent, or keychain. Specifically:
+  - Do not run `ssh-add`, `ssh-agent`, `ssh -T`, or any command that probes, lists, adds, or uses SSH keys.
+  - Do not read or list `~/.ssh/`, `~/.gnupg/`, `~/Library/Keychains/`, or any other credential store.
+  - Do not attempt authenticated git operations (clone, fetch, push, pull against private remotes) on the user's behalf to "work around" sandbox network limits.
+  - Do not request `["all"]` or `["full_network"]` permissions to bypass auth restrictions.
+  - If a build fails because SPM packages or other resources can't be resolved from a sandboxed environment, stop and tell the user. Do not try alternative auth paths.
 
 ## General
 
