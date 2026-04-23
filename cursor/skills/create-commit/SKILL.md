@@ -5,11 +5,11 @@ description: Analyze git changes, intelligently group them into logical commits,
 
 # Create Commit
 
-Analyze git changes, group them logically, draft gitmoji commit messages, and walk the user through approval before committing.
+Analyze git changes, group logically, draft gitmoji messages, walk user through approval before commit.
 
 ## Step 1: Analyze changes
 
-Run these commands to gather full context:
+Run these to gather context:
 
 ```bash
 git status
@@ -21,21 +21,21 @@ git diff --cached
 
 ## Step 2: Group changes into logical commits
 
-Review the diffs and group related changes. Use **one group** if everything shares a single intent; use **multiple groups** if changes serve clearly distinct purposes.
+Review diffs, group related changes. **One group** if shared intent; **multiple groups** if clearly distinct purposes.
 
 Grouping heuristics:
-- Changes to a feature and its tests → same group
-- Config or dependency bumps alongside feature code → same group unless unrelated
-- Refactor mixed with a bug fix → separate groups
-- Formatting/style changes alongside logic changes → separate group
+- Feature + its tests → same group
+- Config/dep bumps alongside feature → same group unless unrelated
+- Refactor + bug fix → separate groups
+- Format/style + logic → separate groups
 
 ## Step 3: If multiple groups — confirm with user
 
-Present a summary of proposed groupings, then use the structured question tool to confirm:
+Summarize proposed groupings, then use structured question tool to confirm:
 
 - In **Cursor**: use the `AskQuestion` tool
 - In **Claude Code**: use the `AskUserQuestion` tool
-- If neither is available: present numbered options in plain text and wait for a reply
+- If neither available: present numbered options in plain text, wait for reply
 
 Question format:
 
@@ -50,22 +50,28 @@ Do these groupings look right?
 
 Options:
 - **Yes, looks good** — proceed to draft commits
-- **No, reorganize** — ask the user how they'd like them split or merged, then re-confirm
+- **No, reorganize** — ask user how to split/merge, then re-confirm
 
-Wait for explicit selection before proceeding.
+Wait for explicit selection.
 
 ## Step 4: Draft commit messages
+
+**Tone — keep it concise and direct**
+- Describe only what was explicitly changed/fixed; don't restate background, motivation, or context the diff already shows
+- No marketing language, no hedging, no recap of how code used to work
+- Prefer short verb-led phrases over full sentences when meaning is clear
+- If a bullet/paragraph adds nothing beyond the summary, drop it
 
 For each group, write a commit using this format:
 
 **Summary line**
-- Start with a gitmoji matching the change intent (see table below)
+- Start with gitmoji matching change intent (see table)
 - All lowercase after the emoji
 - Single sentence, no trailing period
 
 **Body**
-- Bulleted list of specific changes
-- Optional explanatory paragraph for complex commits; omit when summary + bullets are self-evident
+- Bulleted list of specific changes — one line each, no filler
+- Footer paragraph **only** when bullets don't sufficiently explain (e.g. "why" is non-obvious, or constraint/trade-off worth noting); otherwise omit
 
 ### Gitmoji Reference
 
@@ -111,13 +117,13 @@ For each group, write a commit using this format:
 
 ## Step 5: Present drafts for approval
 
-For each commit, output the drafted message to the chat log as a fenced code block, then immediately invoke the structured question tool:
+For each commit, output drafted message to chat as fenced code block, then immediately invoke structured question tool:
 
 - In **Cursor**: use the `AskQuestion` tool
 - In **Claude Code**: use the `AskUserQuestion` tool
-- If neither is available: present numbered options in plain text and wait for a reply
+- If neither available: present numbered options in plain text, wait for reply
 
-**Do not include the commit message content inside the question prompt.** The question prompt contains only the question text and options.
+**Don't put commit message content inside the question prompt.** Prompt contains only question text + options.
 
 Example — output to chat first:
 
@@ -138,13 +144,13 @@ Question: `Commit this message?`
 
 Options:
 - **Approve** — proceed to commit
-- **Request changes** — ask the user what to revise, update the draft, and re-present for approval
+- **Request changes** — ask user what to revise, update draft, re-present for approval
 
-For multiple commits, present each draft individually with its own approval question, in sequence. Do not batch all commits into a single question.
+For multiple commits, present each draft with its own approval question in sequence. Don't batch into single question.
 
 ## Step 6: Commit on approval
 
-Once approved, commit using a heredoc to preserve multi-line formatting:
+Once approved, commit via heredoc to preserve multi-line formatting:
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -160,11 +166,11 @@ EOF
 )"
 ```
 
-For multiple commits, ask the user how to stage each group (by file, by hunk, etc.) before committing each one in sequence.
+For multiple commits, ask user how to stage each group (by file, by hunk, etc.) before committing in sequence.
 
 ## Hard rules
 
 - **Never run `git commit` without explicit user approval**
-- Never pass `--no-verify` or skip hooks unless the user explicitly asks
-- Never amend a commit that has already been pushed to remote
-- If both staged and unstaged changes exist, clarify with the user which to include before drafting
+- Never pass `--no-verify` or skip hooks unless user explicitly asks
+- Never amend a commit already pushed to remote
+- If both staged + unstaged changes exist, clarify with user which to include before drafting
