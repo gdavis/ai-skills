@@ -1,0 +1,41 @@
+---
+description: Prefer the `xcode-tools` MCP server over `xcodebuild`, `xcrun`, `simctl`, and other CLI tooling for any Xcode build, test, diagnostic, preview, or simulator task. Apply whenever a task involves compiling, running tests, reading build/test results, fetching Xcode-reported issues, rendering a SwiftUI/UIKit preview, or executing a Swift snippet inside an Xcode project or workspace.
+alwaysApply: false
+---
+
+# Xcode Build Tooling Rule
+
+When a task involves driving an Xcode project or workspace — building, running tests, reading build logs, fetching diagnostics, rendering previews, executing snippets — **always prefer the `xcode-tools` MCP server first**. Do not jump to `xcodebuild`, `xcrun`, `simctl`, `xed`, or other shell commands.
+
+## Required Workflow
+
+1. **Confirm the MCP is available.** Look for the `xcode-tools` server (identifier `user-xcode-tools`) and read the relevant descriptor in `mcps/user-xcode-tools/tools/*.json` before calling any tool. Most tools require a `tabIdentifier` — discover it with `XcodeListWindows` if you don't already have it.
+2. **Use the MCP tool that matches the task.** Mapping for the `xcode-tools` server:
+
+   | Task | MCP tool | Don't use |
+   | --- | --- | --- |
+   | Build the active scheme | `BuildProject` | `xcodebuild build` |
+   | Read errors/warnings from the most recent build | `GetBuildLog` | parsing `xcodebuild` output |
+   | Run all tests in the active test plan | `RunAllTests` | `xcodebuild test` |
+   | Run specific tests | `RunSomeTests` (use `GetTestList` to discover identifiers) | `xcodebuild test -only-testing:` |
+   | List available tests | `GetTestList` | `xcodebuild -enumerate-tests` |
+   | List open Xcode windows / discover `tabIdentifier` | `XcodeListWindows` | — |
+   | List Issue Navigator issues (post-build, package, workspace) | `XcodeListNavigatorIssues` | — |
+   | Get compiler diagnostics for a single file | `XcodeRefreshCodeIssuesInFile` | — |
+   | Render a SwiftUI/UIKit preview | `RenderPreview` | — |
+   | Run a Swift snippet in the context of a file | `ExecuteSnippet` | one-off `swift` scripts that need project context |
+   | Search Apple Developer Documentation | `DocumentationSearch` | web fetch / scraping `developer.apple.com` |
+
+3. **If — and only if — there is no matching MCP tool, or the MCP server is genuinely unavailable** (not running, all tool calls failing in a way that indicates the server itself is broken), **stop and warn the user** before reaching for the CLI:
+
+   > The `xcode-tools` MCP can't cover this (`<reason: server unavailable / no matching tool for X>`). Want me to fall back to `xcodebuild` / `xcrun` / `simctl`?
+
+   Wait for explicit confirmation before running any Xcode CLI command. If the user declines, ask how they'd like to proceed (fix the MCP, run manually, skip the step).
+
+## Notes
+
+- A single tool-call failure due to bad arguments (e.g., wrong `tabIdentifier`, malformed test specifier) is **not** a reason to fall back. Fix the arguments and retry the MCP tool first.
+- The `xcode-tools` server scope does **not** include simulator control (`xcrun simctl`), archiving, scheme/destination listing, IPA export, or device install. Those are legitimate "no matching tool" cases — the prompt-before-fallback rule still applies.
+- "Genuinely unavailable" means the server is missing from `mcps/`, its `STATUS.md` indicates an error, or tool calls fail with infrastructure-level errors. Don't infer unavailability from a single bad-arg failure.
+- In non-interactive contexts where prompting is impossible, surface the unavailability in the final response and stop, rather than silently shelling out.
+- This rule is specifically about driving Xcode actions. Unrelated shell usage (`git`, `ls`, `rg`, file ops) is unaffected.
