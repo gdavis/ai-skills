@@ -1,0 +1,51 @@
+---
+description: xcode-tools MCP for all Xcode ops — no CLI unless MCP down + user approves fallback
+alwaysApply: true
+---
+
+# Xcode Tools MCP
+
+`user-xcode-tools` for **any** Xcode op it covers — not just builds/tests. No `xcodebuild`, `swift test`, `simctl`, manual `pbxproj` edits, or other CLI when MCP tool exists.
+
+## Workflow
+
+1. Confirm `user-xcode-tools` enabled
+2. Read tool schema before `CallMcpTool`
+3. `XcodeListWindows` → `tabIdentifier` (most tools need it)
+4. List tools in MCP folder if unsure; use match
+
+## Tool categories
+
+**Build & run:** `BuildProject`, `RunProject`, `StopProject`, `GetBuildLog`, `GetConsoleOutput`
+
+**Tests:** `GetTestList`, `RunAllTests`, `RunSomeTests`
+
+**Scheme & destination:** `XcodeListSchemes`, `XcodeSwitchScheme`, `XcodeListRunDestinations`, `XcodeSwitchRunDestination`
+
+**Settings & flags:** `GetTargetBuildSettings`, `UpdateTargetBuildSetting`, `GetFileCompilerFlags`, `UpdateFileCompilerFlags`
+
+**Issues & diagnostics:** `XcodeListNavigatorIssues`, `XcodeRefreshCodeIssuesInFile`, `GetTopCrashIssues`, `GetCrashIssueLogs`, `GetTopFieldPerformanceIssues`, `GetFieldPerformanceIssueLogs`
+
+**Device interaction:** `DeviceInteractionStartSession`, `DeviceInteractionInstallAndRun`, `DeviceInteractionSynthesize`, `DeviceInteractionEndSession`
+
+**Debug:** `InvokeDebuggerCommand`, `RunCodeSnippet`
+
+**Project files:** `XcodeRead`, `XcodeWrite`, `XcodeUpdate`, `XcodeLS`, `XcodeGlob`, `XcodeGrep`, `XcodeMV`, `XcodeRM`, `XcodeMakeDir`, `XcodeGetCurrentFile`, `AddEntitlement`, `AddInfoPlist`
+
+**Localization:** `StringCatalogRead`, `StringCatalogEdit`, `StringCatalogContext`, `LocalizationPlanner`
+
+**UI:** `RenderPreview`
+
+**Docs:** `DocumentationSearch`
+
+## MCP unavailable
+
+**Stop.** No silent CLI fallback.
+
+Tell user: MCP missing or failed; Xcode may need permission prompt approved; enable MCP in Cursor or approve CLI fallback.
+
+CLI only after explicit user OK ("use command line", "fallback to xcodebuild").
+
+## Failures
+
+Read `fullLogPath`, `fullSummaryPath`, or `GetBuildLog` — not truncated summary alone.
