@@ -63,8 +63,21 @@ When the user starts a new task or provides a prompt that is not continuing an a
 - If something is unused, delete it completely
 - Do not use deprecated APIs
 - Enforce DRY (do not repeat yourself) coding principles
-- Inline comments should use single sentences in an all lowercase format. Comments for classes and methods that use DocC style (e.g. `///` prefix) should use sentence case
-- For complex inline comments, prefix the message with `NOTE:` and use sentence case and 1-3 sentences to describe why code is doing what it is
+
+## Comments
+
+- Default: NO comments. Code self-document via naming and structure.
+- Inline comment only when behavior non-obvious: workaround, subtle invariant, non-trivial algorithm, external constraint.
+- Never narrate code (e.g. `// increment counter`, `// loop through items`, `// return result`, `// guard against nil`).
+- Never add DocC (`///`) unless signature alone insufficient. Document semantics, units, ownership, threading, side effects, failure modes.
+- Never restate symbol name in DocC (e.g. `/// The user's name.` on `var name: String`).
+- Never duplicate docs at call sites. Definition already documents it.
+- Comments describe CURRENT behavior only. No history. Forbidden: `// used to do X, now does Y`, `// previously...`, `// changed from...`, `// no longer needed`.
+- When changing code, rewrite or delete stale comments to match new behavior.
+- Justified comments explain WHY, not WHAT. Only when reason not self-evident.
+- Inline: single sentence, lowercase, no trailing period.
+- DocC (`///`): sentence case, full punctuation.
+- Complex WHY comments: prefix `NOTE:`, sentence case, 1-3 sentences.
 
 ## Conditional Rules
 
