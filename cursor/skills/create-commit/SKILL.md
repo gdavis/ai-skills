@@ -108,6 +108,7 @@ For each group, write a commit using this format:
 | 🛂 | authorization, roles, and permissions |
 | 🧵 | multithreading or concurrency |
 | 🦺 | add or update validation |
+| 🤖 | add or update ai skills or rules |
 
 ## Step 5: Present drafts for approval
 
