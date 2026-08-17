@@ -31,28 +31,24 @@ Grouping heuristics:
 
 ## Step 3: If multiple groups — confirm with user
 
-Present a summary of proposed groupings, then use the structured question tool to confirm:
+Use the same two-turn split as Step 5. Cursor often hides chat text that shares a turn with `AskQuestion`.
 
-- In **Cursor**: use the `AskQuestion` tool
-- In **Claude Code**: use the `AskUserQuestion` tool
-- If neither is available: present numbered options in plain text and wait for a reply
-
-Question format:
+**Turn A — chat only (tools forbidden):** print the grouping summary, then `Continue for the grouping confirmation, or say how to split/merge.` Do not call `AskQuestion` / `AskUserQuestion` or any other tool. End the turn.
 
 ```
 I found N logical commit groups:
 
 Group 1 — [one-line intent] (foo.swift, bar.swift)
 Group 2 — [one-line intent] (baz.swift)
-
-Do these groupings look right?
 ```
+
+**Turn B — after the user's next message:** if they already approved or gave a regrouping, follow that. Otherwise invoke `AskQuestion` / `AskUserQuestion` with a short prompt only — do not paste the grouping list into the card.
+
+Question: `Do these groupings look right?`
 
 Options:
 - **Yes, looks good** — proceed to draft commits
-- **No, reorganize** — ask the user how they'd like them split or merged, then re-confirm
-
-Wait for explicit selection before proceeding.
+- **No, reorganize** — ask the user how they'd like them split or merged, then re-confirm from Turn A
 
 ## Step 4: Draft commit messages
 
@@ -112,17 +108,13 @@ For each group, write a commit using this format:
 
 ## Step 5: Present drafts for approval
 
-**CRITICAL: Output full commit message in chat response text BEFORE invoking approval question.**
+Cursor often does **not** render assistant chat that shares a turn with `AskQuestion` / `AskUserQuestion`. The draft must appear in a **tool-free** turn first. The approval card is a short confirm only — never the place the user reads the message.
 
-- In **Cursor**: use `AskQuestion` tool
-- In **Claude Code**: use `AskUserQuestion` tool
-- If neither is available: fenced code block, wait for reply
+### Turn A — print the draft (tools forbidden)
 
-**Do not put commit message in question prompt.** Prompt = question text + options only. Message must be visible in chat above the question.
+Output the full commit message in a fenced `text` block, then one line of instructions. This response must contain **no tool calls**.
 
-Example — output to chat first:
-
-```
+```text
 ✨ add offline sync queue for failed network requests
 
 - add SyncQueue to buffer requests when connectivity is lost
@@ -133,15 +125,33 @@ Ensures no data loss during intermittent connectivity without
 requiring changes to the existing API call sites.
 ```
 
-Then invoke question tool:
+Continue for the approval dialog, or reply Approve / Request changes.
 
-Question: `Commit this message?`
+**FORBIDDEN in Turn A:** `AskQuestion`, `AskUserQuestion`, and any other tool. If you are about to call a question tool, you have failed this step — delete the tool call and send the fenced message only. End the turn.
+
+### Turn B — approval card (only after the user replies)
+
+Wait for the user's next message (Continue, OK, or anything else).
+
+- If they already said **Approve** (or unambiguous yes) → skip the card, go to Step 6.
+- If they said **Request changes** (or described edits) → revise, then repeat Turn A.
+- Otherwise invoke the question tool with a **short** prompt. Do **not** put the commit message in the prompt; it is already in chat.
+
+Cursor `AskQuestion`:
+- `title`: `Commit this message?`
+- `prompt`: `Commit the message printed above?`
+
+Claude Code `AskUserQuestion`: same short question text.
 
 Options:
 - **Approve** — proceed to commit
-- **Request changes** — ask what to revise, update draft, re-present
+- **Request changes** — ask what to revise, update draft, re-present from Turn A
 
-Multiple commits: each gets its own approval question in sequence.
+Skipped/dismissed/timed-out = NOT approval.
+
+If no question tool is available: Turn A already asked them to reply in chat — wait for that reply.
+
+Multiple commits: each commit gets its own Turn A → wait → Turn B sequence.
 
 ## Step 6: Commit on approval
 
@@ -166,7 +176,8 @@ For multiple commits, ask the user how to stage each group (by file, by hunk, et
 ## Hard rules
 
 - **Never `git commit` without explicit user approval.** "Approve" selection or unambiguous affirmative required. Skipped/dismissed/timed-out = NOT approval. Never infer consent.
-- **Never invoke approval question without first outputting full commit message in chat response text.**
+- **Never call `AskQuestion` / `AskUserQuestion` in the same turn as the commit draft.** Turn A is text-only. The draft must already be visible in chat before Turn B.
+- **Never put the commit message in the approval question prompt.** The card is Approve / Request changes only.
 - Never `--no-verify` or skip hooks unless user explicitly asks
 - Never amend commit already pushed to remote
 - If both staged + unstaged changes exist, clarify with user which to include before drafting
